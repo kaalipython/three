@@ -4,9 +4,95 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Apartment Viewer</title>
-    <script src="https://cdn.jsdelivr.net/npm/three@latest/build/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@latest/examples/js/controls/OrbitControls.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@latest/examples/js/loaders/GLTFLoader.js"></script>
+
+    <!-- Import Three.js and related modules -->
+    <script type="module">
+        import * as THREE from 'https://cdn.jsdelivr.net/npm/three@latest/build/three.module.js';
+        import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@latest/examples/js/controls/OrbitControls.js';
+        import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@latest/examples/js/loaders/GLTFLoader.js';
+
+        // Scene, Camera, and Renderer Setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // Lighting Setup
+        const light = new THREE.DirectionalLight(0xffffff, 2);
+        light.position.set(10, 10, 10);
+        scene.add(light);
+
+        // OrbitControls for panning, rotating, and zooming
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.enablePan = true;
+        controls.enableRotate = false;  // Disable rotation if you want just panning
+        controls.minDistance = 2;
+        controls.maxDistance = 20;
+
+        // Load 3D Model (GLTF)
+        const loader = new GLTFLoader();
+        let apartment;
+        loader.load('apartment.glb', function (gltf) {
+            apartment = gltf.scene;
+            scene.add(apartment);
+        });
+
+        // Raycasting for Selection
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        let selectedUnit = null;
+
+        window.addEventListener('click', (event) => {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(scene.children, true);
+
+            if (intersects.length > 0) {
+                selectedUnit = intersects[0].object;
+                focusOnSelectedUnit(selectedUnit);
+            }
+        });
+
+        // Function to Zoom and Pan to the Selected Unit
+        function focusOnSelectedUnit(unit) {
+            const targetPosition = new THREE.Vector3();
+            unit.getWorldPosition(targetPosition);
+
+            // Smooth zoom and pan to the unit
+            gsap.to(camera.position, {
+                x: targetPosition.x + 2,
+                y: targetPosition.y + 2,
+                z: targetPosition.z + 4,
+                duration: 1.5,
+                ease: "power2.inOut"
+            });
+
+            controls.target.set(targetPosition.x, targetPosition.y, targetPosition.z);
+            controls.update();
+        }
+
+        // Animation Loop
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // Responsive Window Resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+
+    <!-- GSAP Library for Smooth Animations -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
 
     <style>
         body { margin: 0; overflow: hidden; }
@@ -14,93 +100,5 @@
     </style>
 </head>
 <body>
-
-<script type="module">
-    // 🔹 Create Scene, Camera, Renderer
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(5, 5, 10); // Start position
-
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    document.body.appendChild(renderer.domElement);
-
-    // 🔹 Lighting
-    const light = new THREE.DirectionalLight(0xffffff, 2);
-    light.position.set(10, 10, 10);
-    scene.add(light);
-
-    // 🔹 Orbit Controls (for panning, zooming, rotating)
-    const controls = new THREE.OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.enablePan = true;
-    controls.minDistance = 2; // Minimum zoom
-    controls.maxDistance = 20; // Maximum zoom
-
-    // 🔹 Load the Apartment 3D Model
-    const loader = new THREE.GLTFLoader();
-    let apartment;
-    loader.load('bakedpro.glb', function (gltf) {
-        apartment = gltf.scene;
-        scene.add(apartment);
-    });
-
-    // 🔹 Raycasting for Selection
-    const raycaster = new THREE.Raycaster();
-    const mouse = new THREE.Vector2();
-    let selectedUnit = null;
-
-    window.addEventListener('click', (event) => {
-        // Convert Click to Normalized Device Coordinates
-        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-        mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
-
-        // Perform Raycasting
-        raycaster.setFromCamera(mouse, camera);
-        const intersects = raycaster.intersectObjects(scene.children, true);
-
-        if (intersects.length > 0) {
-            selectedUnit = intersects[0].object;
-            focusOnSelectedUnit(selectedUnit);
-        }
-    });
-
-    // 🔹 Function to Zoom and Pan to the Selected Unit
-    function focusOnSelectedUnit(unit) {
-        const targetPosition = new THREE.Vector3();
-        unit.getWorldPosition(targetPosition);
-
-        // Smooth zoom and pan to the unit
-        gsap.to(camera.position, {
-            x: targetPosition.x + 2, // Offset to view from an angle
-            y: targetPosition.y + 2,
-            z: targetPosition.z + 4,
-            duration: 1.5,
-            ease: "power2.inOut"
-        });
-
-        controls.target.set(targetPosition.x, targetPosition.y, targetPosition.z);
-        controls.update();
-    }
-
-    // 🔹 Animate Scene
-    function animate() {
-        requestAnimationFrame(animate);
-        controls.update();
-        renderer.render(scene, camera);
-    }
-    animate();
-
-    // 🔹 Responsive Window Resize
-    window.addEventListener('resize', () => {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-    });
-</script>
-
-<!-- GSAP Library for Smooth Animation -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
-<h1 style="background-color:yellow">stalin samuel</h1>
 </body>
 </html>
